@@ -216,3 +216,10 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# C Binaries
+*.o
+*.exe
+net_crypto_core
+*.bin
+venv/
