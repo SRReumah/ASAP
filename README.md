@@ -43,13 +43,13 @@ Every result is computed live by real backend engines, written to disk as artifa
 
 ## ✨ Key Features
 
-- **Intelligent mode switching** – detects flooded road segments and automatically reroutes from ground transport to air-relief drones.
-- **Tamper-resistant telemetry** – drone command packets are encrypted with AES-256-CBC and signed with an HMAC-SHA256 integrity tag, packed into a fixed 109-byte binary struct.
-- **Optimal cargo packing** – Integer Linear Programming maximizes priority-weighted relief value under strict payload limits.
-- **⛽ Predictive fuel alarms** – EOQ and statistical safety-stock models trigger reorders before a hospital reaches a critical level.
-- **⏱️ Mission timeline forecasting** – PERT/CPM computes expected durations, variance, slack and the critical path of every flight loop.
-- **🖥️ Live command dashboard** – dual-view UI (Hospital phone unit / Command Center laptop) backed by a Python API server that executes the real engines on demand.
-- **Modular by design** – each engine runs standalone for testing and review, or chained together as a full pipeline.
+- **Intelligent mode switching** - detects flooded road segments and automatically reroutes from ground transport to air-relief drones.
+- **Tamper-resistant telemetry** - drone command packets are encrypted with AES-256-CBC and signed with an HMAC-SHA256 integrity tag, packed into a fixed 109-byte binary struct.
+- **Optimal cargo packing** - Integer Linear Programming maximizes priority-weighted relief value under strict payload limits.
+- **Predictive fuel alarms** - EOQ and statistical safety-stock models trigger reorders before a hospital reaches a critical level.
+- **Mission timeline forecasting** - PERT/CPM computes expected durations, variance, slack and the critical path of every flight loop.
+- **Live command dashboard** - dual-view UI (Hospital phone unit / Command Center laptop) backed by a Python API server that executes the real engines on demand.
+- **Modular by design** - each engine runs standalone for testing and review, or chained together as a full pipeline.
 
 ---
 
@@ -271,6 +271,6 @@ Distributed under the MIT License. See `LICENSE` for details.
 
 <div align="center">
 
-**Built to get help where it's needed — ASAP.**
+**Built to get help where it's needed - ASAP.**
 
 </div>
