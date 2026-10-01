@@ -29,6 +29,9 @@ When a severe flood hits a city, roads go underwater, power fails, and communica
 
 ### The Solution
 **Project ASAP** is an automated emergency-response "brain". A single distress broadcast from a hospital triggers a four-stage decision pipeline that:
+<img width="1913" height="801" alt="Screenshot 2026-10-02 020208" src="https://github.com/user-attachments/assets/4a6490dc-d67d-43bf-9ccb-40d69d42bf26" />
+<img width="1897" height="538" alt="Screenshot 2026-10-02 020234" src="https://github.com/user-attachments/assets/e40de7ce-c4d4-43ce-add5-5176d722615b" />
+<img width="1896" height="772" alt="Screenshot 2026-10-02 020246" src="https://github.com/user-attachments/assets/87e0d44d-66b7-46b6-b52b-2c7487c680f6" />
 
 | Question | Engine | Answer (reference scenario) |
 |---|---|---|
