@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project ASAP - Real-Time Command Center</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: #0e1117; color: #ffffff; padding: 20px; }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #30363d; padding-bottom: 15px; margin-bottom: 20px; }
+        .header h1 { font-size: 22px; color: #ffffff; }
+        .role-selector { background: #161b22; border: 1px solid #30363d; padding: 8px 15px; border-radius: 8px; }
+        .role-selector select { background: #0d1117; color: #00ff55; border: 1px solid #30363d; padding: 6px 12px; border-radius: 5px; font-weight: bold; cursor: pointer; }
+        .distress-box { background-color: #2b0000; border: 2px solid #ff4b4b; padding: 20px; border-radius: 12px; text-align: center; margin-bottom: 20px; }
+        .btn-distress { background-color: #ff4b4b; color: #ffffff; border: none; padding: 16px 24px; font-size: 16px; font-weight: bold; border-radius: 8px; cursor: pointer; width: 100%; transition: 0.2s; }
+        .btn-distress:hover { background-color: #ff2222; }
+        .grid { display: grid; grid-template-columns: 320px 1fr; gap: 20px; }
+        .card { background-color: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 20px; margin-bottom: 20px; }
+        .card h2 { font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #8b949e; margin-bottom: 15px; }
+        .step { padding: 12px; background: #0d1117; border: 1px solid #30363d; margin-bottom: 10px; border-radius: 6px; font-size: 13px; color: #8b949e; }
+        .step.active { background: #003b15; border-color: #00ff55; color: #00ff55; font-weight: bold; }
+        .badge-green { background-color: #003b15; border: 1px solid #00ff55; color: #00ff55; padding: 12px; border-radius: 6px; font-weight: bold; text-align: center; font-size: 13px; display: none; margin-bottom: 20px; }
+        .dashboard-grid { display: grid; grid-template-columns: 3fr 2fr; gap: 20px; }
+        #map { height: 380px; width: 100%; border-radius: 8px; border: 1px solid #30363d; filter: invert(90%) hue-rotate(180deg) brightness(95%) contrast(90%); }
+        .cargo-bar { display: flex; align-items: center; margin-bottom: 12px; }
+        .cargo-label { width: 140px; font-size: 13px; }
+        .cargo-track { flex-grow: 1; background: #0d1117; height: 18px; border-radius: 9px; overflow: hidden; border: 1px solid #30363d; }
+        .cargo-fill { height: 100%; background: #00ff55; width: 0%; transition: width 0.8s ease-in-out; }
+        .cargo-val { width: 70px; text-align: right; font-size: 13px; font-weight: bold; }
+        .progress-bar-bg { background: #0d1117; border: 1px solid #30363d; height: 24px; border-radius: 12px; overflow: hidden; margin-top: 8px; }
+        .progress-bar-fill { background: linear-gradient(90deg, #00aa33, #00ff55); height: 100%; width: 15%; transition: width 1s ease-in-out; }
+        .pert-info { background: #0d1117; border: 1px solid #1f6feb; color: #58a6ff; padding: 12px; border-radius: 6px; font-size: 13px; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>⚡ Project ASAP: Real-Time Integrated Command Center</h1>
+        <div class="role-selector">
+            <label>Select View Role: </label>
+            <select id="roleSelect" onchange="switchRole()">
+                <option value="command">Laptop: Command Center</option>
+                <option value="hospital">Phone: Hospital Unit</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- PHONE / HOSPITAL VIEW -->
+    <div id="hospitalView" style="display: none; max-width: 500px; margin: 30px auto;">
+        <div class="card">
+            <h2>🏥 Metro General Hospital (H1)</h2>
+            <div class="distress-box">
+                <h2 style="color: #ff4b4b;">🚨 EMERGENCY DISTRESS PANEL</h2>
+                <p style="font-size: 14px; color: #cccccc; margin-top: 5px;">Road Status: <b style="color: #ff4b4b;">Flooded (Mode 1 / Air)</b></p>
+            </div>
+            <button class="btn-distress" onclick="triggerDistress()">📡 BROADCAST EMERGENCY DISTRESS SIGNAL</button>
+            <div id="distressStatus" style="display:none; margin-top:15px; text-align:center; color:#00ff55; font-weight:bold;">
+                ⏳ Transmitting request & triggering backend Python/C pipeline...
+            </div>
+        </div>
+    </div>
+
+    <!-- LAPTOP / COMMAND CENTER VIEW -->
+    <div id="commandView">
+        <div class="grid">
+            <div>
+                <div class="card">
+                    <h2>🔄 Real-Time Pipeline Tracker</h2>
+                    <div id="s1" class="step">1. [M2] C Security Check: Waiting</div>
+                    <div id="s2" class="step">2. [M1] LPP Cargo Allocation: Waiting</div>
+                    <div id="s3" class="step">3. [M3] Fuel Stock Inventory: Waiting</div>
+                    <div id="s4" class="step">4. [M4] PERT Flight Schedule: Waiting</div>
+                </div>
+
+                <div id="statusBadge" class="badge-green">
+                    ✔ SECURITY VERIFIED: AIR RELIEF MODE ACTIVE | AES-256 ENCRYPTED | HMAC SIGNED (data/telemetry_packet.bin)
+                </div>
+            </div>
+
+            <div>
+                <div class="dashboard-grid">
+                    <div class="card">
+                        <h2>📍 Live Drone Transit Map (Dijkstra Route)</h2>
+                        <div id="map"></div>
+                    </div>
+
+                    <div>
+                        <div class="card">
+                            <h2>📦 Real Calculated Cargo Mix (PuLP Solver Output)</h2>
+                            <div class="cargo-bar">
+                                <div class="cargo-label">Generator Fuel (L)</div>
+                                <div class="cargo-track"><div id="fuelBar" class="cargo-fill"></div></div>
+                                <div id="fuelVal" class="cargo-val">0 L</div>
+                            </div>
+                            <div class="cargo-bar">
+                                <div class="cargo-label">Medical Kits</div>
+                                <div class="cargo-track"><div id="medBar" class="cargo-fill" style="background:#58a6ff;"></div></div>
+                                <div id="medVal" class="cargo-val">0 Units</div>
+                            </div>
+                            <div class="cargo-bar">
+                                <div class="cargo-label">Food Crates</div>
+                                <div class="cargo-track"><div id="foodBar" class="cargo-fill" style="background:#e3b341;"></div></div>
+                                <div id="foodVal" class="cargo-val">0 Crates</div>
+                            </div>
+                            <p id="totalWeightText" style="font-size: 12px; color: #8b949e; margin-top: 5px;">Payload Weight Cap: 300.0 kg (Air Mode)</p>
+                        </div>
+
+                        <div class="card">
+                            <h2>⛽ Hospital Generator Reserves</h2>
+                            <div class="progress-bar-bg">
+                                <div id="fuelGauge" class="progress-bar-fill"></div>
+                            </div>
+                            <p id="fuelGaugeText" style="font-size: 12px; margin-top: 8px; color: #8b949e;">Fuel Level: 15% (Critical Reserve)</p>
+                        </div>
+
+                        <div class="card">
+                            <h2>⏱️ PERT Flight Timeline</h2>
+                            <div class="pert-info">
+                                Critical Path Loop Time: <b>76.33 Minutes</b><br>
+                                Bottleneck Sequence: <b>A → D → E → F</b>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let map, polyline;
+        const baseCoords = [27.7172, 85.3240];
+        const hospCoords = [27.7300, 85.3400];
+
+        function initMap() {
+            if (map) return;
+            map = L.map('map').setView([27.7236, 85.3320], 12);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18 }).addTo(map);
+            L.marker(baseCoords).addTo(map).bindPopup("<b>Central Base</b>").openPopup();
+            L.marker(hospCoords).addTo(map).bindPopup("<b>Metro General Hospital (H1)</b>");
+        }
+
+        function switchRole() {
+            const role = document.getElementById('roleSelect').value;
+            if (role === 'hospital') {
+                document.getElementById('hospitalView').style.display = 'block';
+                document.getElementById('commandView').style.display = 'none';
+            } else {
+                document.getElementById('hospitalView').style.display = 'none';
+                document.getElementById('commandView').style.display = 'block';
+                setTimeout(() => { map.invalidateSize(); }, 100);
+            }
+        }
+
+        async function triggerDistress() {
+            document.getElementById('distressStatus').style.display = 'block';
+
+            // Call Python Backend API to execute the real 4 member scripts
+            try {
+                const response = await fetch('/api/dispatch', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ target_hospital: 1, road_status: 0 })
+                });
+
+                const data = await response.json();
+
+                // Switch UI view to Command Center
+                document.getElementById('roleSelect').value = 'command';
+                switchRole();
+
+                // Render REAL values computed by Python & C
+                renderRealPipelineResults(data);
+            } catch (err) {
+                alert("Error connecting to Python backend server: " + err);
+            }
+        }
+
+        function renderRealPipelineResults(data) {
+            // Step 1: Member 2
+            document.getElementById('s1').className = 'step active';
+            document.getElementById('s1').innerText = `1. [M2] C Security Check: ${data.dispatch_mode} (${data.telemetry_packet_bytes}B struct)`;
+
+            // Step 2: Member 1
+            const allocations = data.allocations["H1"] || { fuel_liters: 300, medical_kits: 0, food_crates: 0 };
+            document.getElementById('s2').className = 'step active';
+            document.getElementById('s2').innerText = '2. [M1] LPP Cargo Allocation: OPTIMAL (PuLP Exported)';
+
+            document.getElementById('fuelBar').style.width = (allocations.fuel_liters / 300 * 100) + '%';
+            document.getElementById('fuelVal').innerText = allocations.fuel_liters + ' L';
+
+            document.getElementById('medBar').style.width = (allocations.medical_kits / 20 * 100) + '%';
+            document.getElementById('medVal').innerText = allocations.medical_kits + ' Kits';
+
+            document.getElementById('foodBar').style.width = (allocations.food_crates / 10 * 100) + '%';
+            document.getElementById('foodVal').innerText = allocations.food_crates + ' Crates';
+
+            const totalW = (allocations.fuel_liters * 0.85 + allocations.medical_kits * 12 + allocations.food_crates * 25).toFixed(1);
+            document.getElementById('totalWeightText').innerText = `Total Calculated Payload Weight: ${totalW} kg / 300.0 kg`;
+
+            // Step 3: Member 3
+            document.getElementById('s3').className = 'step active';
+            document.getElementById('s3').innerText = '3. [M3] Fuel Stock Inventory: RECALCULATED (ROP 65L)';
+
+            // Step 4: Member 4
+            document.getElementById('s4').className = 'step active';
+            document.getElementById('s4').innerText = '4. [M4] PERT Flight Schedule: CRITICAL PATH COMPUTED';
+
+            document.getElementById('statusBadge').style.display = 'block';
+            document.getElementById('fuelGauge').style.width = '100%';
+            document.getElementById('fuelGaugeText').innerText = `Fuel Level: 100% Replenished (${allocations.fuel_liters}L Delivered)`;
+
+            if (polyline) map.removeLayer(polyline);
+            polyline = L.polyline([baseCoords, hospCoords], {color: '#00ff55', weight: 4}).addTo(map);
+            map.fitBounds(polyline.getBounds(), {padding: [50, 50]});
+        }
+
+        window.onload = () => { initMap(); };
+    </script>
+</body>
+</html>

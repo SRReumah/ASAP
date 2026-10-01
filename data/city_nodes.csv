@@ -1,6 +1,6 @@
-node_id,node_type,name,urgency_score,med_demand_units,food_demand_units,distance_km,storage_cap_units
-W1,Warehouse,Central_Warehouse,0,0,0,0,10000
-H1,Hospital,Metro_General,9,150,300,12,500
-H2,Hospital,St_Jude_Clinic,7,100,200,25,350
-H3,Hospital,East_Wing_ER,10,200,400,18,600
-H4,Hospital,South_Relief_Hub,8,120,250,30,400
+node_id,node_type,name,urgency_score,med_demand_units,food_demand_units,fuel_demand_liters,distance_km,storage_cap_units,road_accessible,latitude,longitude
+   W1,Warehouse,Central_Base,0,0,0,0,0,10000,1,27.7172,85.3240
+   H1,Hospital,Metro_General,9,150,300,500,12,500,0,27.7300,85.3400
+   H2,Hospital,St_Jude_Clinic,7,100,200,250,25,350,1,27.6900,85.3100
+   H3,Hospital,East_Wing_ER,10,200,400,600,18,600,0,27.7100,85.3600
+   H4,Hospital,South_Relief_Hub,8,120,250,300,30,400,1,27.6700,85.3300
