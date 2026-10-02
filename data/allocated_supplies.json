@@ -1,35 +1,43 @@
 {
     "status": "Optimal",
-    "dispatch_mode": "AIR_RELIEF_DRONE",
-    "payload_weight_cap_kg": 300.0,
+    "dispatch_mode": "GROUND_TRUCK",
+    "payload_weight_cap_kg": 3000.0,
     "allocations": {
-        "   H1": {
+        "H1": {
             "name": "Metro_General",
-            "medical_kits": 0,
-            "food_crates": 0,
-            "fuel_liters": 352,
-            "road_accessible": 0
+            "medical_kits": 150,
+            "food_crates": 31,
+            "fuel_liters": 500,
+            "delivered_weight_kg": 3000.0,
+            "road_accessible": 1,
+            "distance_km": 2.12
         },
-        "   H2": {
+        "H2": {
             "name": "St_Jude_Clinic",
-            "medical_kits": 7,
-            "food_crates": 0,
+            "medical_kits": 100,
+            "food_crates": 63,
             "fuel_liters": 250,
-            "road_accessible": 1
+            "delivered_weight_kg": 2987.5,
+            "road_accessible": 1,
+            "distance_km": 3.32
         },
-        "   H3": {
+        "H3": {
             "name": "East_Wing_ER",
-            "medical_kits": 0,
-            "food_crates": 0,
-            "fuel_liters": 352,
-            "road_accessible": 0
+            "medical_kits": 200,
+            "food_crates": 3,
+            "fuel_liters": 600,
+            "delivered_weight_kg": 2985.0,
+            "road_accessible": 1,
+            "distance_km": 3.63
         },
-        "   H4": {
+        "H4": {
             "name": "South_Relief_Hub",
-            "medical_kits": 3,
-            "food_crates": 0,
+            "medical_kits": 120,
+            "food_crates": 52,
             "fuel_liters": 300,
-            "road_accessible": 1
+            "delivered_weight_kg": 2995.0,
+            "road_accessible": 1,
+            "distance_km": 5.28
         }
     }
 }

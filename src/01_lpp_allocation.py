@@ -1,122 +1,135 @@
-import csv
+import importlib.util
 import json
 import os
 import sys
+import pulp
+from pulp import LpProblem, LpMaximize, LpVariable, lpSum, LpStatus
 
-def load_city_nodes(csv_path):
-    if not os.path.exists(csv_path):
-        print(f"[ERROR] Node dataset missing at: {csv_path}")
-        sys.exit(1)
-        
-    hospitals = []
-    with open(csv_path, mode="r", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            if row.get("node_type") == "Hospital":
-                hospitals.append({
-                    "id": row["node_id"],
-                    "name": row["name"],
-                    "urgency": int(row["urgency_score"]),
-                    "med_demand": int(row["med_demand_units"]),
-                    "food_demand": int(row["food_demand_units"]),
-                    "fuel_demand": int(row["fuel_demand_liters"]),
-                    "distance": float(row["distance_km"]),
-                    "storage_cap": int(row["storage_cap_units"]),
-                    "road_accessible": int(row["road_accessible"])
-                })
-    return hospitals
+# Dynamic import for Member 2 module
+spec = importlib.util.spec_from_file_location("m2_route_risk", os.path.join("src", "02_route_risk.py"))
+m2_module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(m2_module)
+evaluate_route_telemetry = m2_module.evaluate_route_telemetry
 
-def run_lpp_allocation(hospitals, target_mode=1):
-    PAYLOAD_WEIGHT_CAP = 300.0 if target_mode == 1 else 3000.0
-    
-    # Global Warehouse Supply Limits
-    rem_global_med = 600
-    rem_global_food = 1000
-    rem_global_fuel = 2000
-    
-    # Commodity Unit Weights (kg)
-    WEIGHT_MED = 12.0
-    WEIGHT_FOOD = 25.0
-    WEIGHT_FUEL = 0.85
-    
-    # Prioritize higher-urgency hospitals first
-    sorted_hospitals = sorted(hospitals, key=lambda x: x["urgency"], reverse=True)
-    allocations = {}
-    
-    for h in sorted_hospitals:
-        h_id = h["id"]
-        urgency = h["urgency"]
-        
-        max_val = -1.0
-        best_m, best_f, best_l = 0, 0, 0
-        
-        max_m = min(h["med_demand"], rem_global_med, int(PAYLOAD_WEIGHT_CAP // WEIGHT_MED))
-        max_f = min(h["food_demand"], rem_global_food, int(PAYLOAD_WEIGHT_CAP // WEIGHT_FOOD))
-        
-        # Exact Bounded Integer Optimization Search
-        for m in range(max_m + 1):
-            for f in range(max_f + 1):
-                used_w = (m * WEIGHT_MED) + (f * WEIGHT_FOOD)
-                rem_w = PAYLOAD_WEIGHT_CAP - used_w
-                if rem_w < 0:
-                    continue
-                
-                # Maximizing Generator Fuel (3.0 urgency multiplier) under remaining weight cap
-                l = min(h["fuel_demand"], rem_global_fuel, int(rem_w // WEIGHT_FUEL))
-                
-                # Objective Function: Priority-Weighted Relief Value
-                val = urgency * ((3.0 * l) + (2.5 * m) + (1.2 * f))
-                if val > max_val:
-                    max_val = val
-                    best_m, best_f, best_l = m, f, l
-                    
-        rem_global_med -= best_m
-        rem_global_food -= best_f
-        rem_global_fuel -= best_l
-        
-        allocations[h_id] = {
-            "name": h["name"],
-            "medical_kits": best_m,
-            "food_crates": best_f,
-            "fuel_liters": best_l,
-            "road_accessible": h["road_accessible"]
-        }
-        
-    dispatch_mode = "AIR_RELIEF_DRONE" if target_mode == 1 else "GROUND_TRUCK"
-    
-    print("\n========================================================")
-    print("      MEMBER 1: LPP CARGO ALLOCATION SOLVER             ")
-    print("========================================================")
-    print(f"Solver Status: Optimal")
-    print(f"Transport Mode: {dispatch_mode} (Max {PAYLOAD_WEIGHT_CAP} kg/run)\n")
-    
-    # Sort back by original Hospital ID order for clean output
-    ordered_allocations = {}
-    for h in hospitals:
-        h_id = h["id"]
-        info = allocations[h_id]
-        ordered_allocations[h_id] = info
-        print(f"Node [{h_id}] {info['name']:<18} | Fuel: {info['fuel_liters']:<4} L | Meds: {info['medical_kits']:<3} | Food: {info['food_crates']:<3}")
-    print("========================================================\n")
-    
-    return {
-        "status": "Optimal",
-        "dispatch_mode": dispatch_mode,
-        "payload_weight_cap_kg": PAYLOAD_WEIGHT_CAP,
-        "allocations": ordered_allocations
+
+def run_lpp_allocation(hospitals, target_mode=0):
+    SUPPLY_MED = 600
+    SUPPLY_FOOD = 1000
+    SUPPLY_FUEL = 2000
+
+    WEIGHT_MED = 12.0   # kg/kit
+    WEIGHT_FOOD = 25.0  # kg/crate
+    WEIGHT_FUEL = 0.85  # kg/liter
+
+    prob = LpProblem("Disaster_Relief_Allocation", LpMaximize)
+
+    med_vars = {
+        h["id"]: LpVariable(f"Med_{h['id']}", lowBound=0, cat="Integer")
+        for h in hospitals
+    }
+    food_vars = {
+        h["id"]: LpVariable(f"Food_{h['id']}", lowBound=0, cat="Integer")
+        for h in hospitals
+    }
+    fuel_vars = {
+        h["id"]: LpVariable(f"Fuel_{h['id']}", lowBound=0, cat="Integer")
+        for h in hospitals
     }
 
+    prob += (
+        lpSum(
+            [
+                (fuel_vars[h["id"]] * h["urgency"] * 3.0)
+                + (med_vars[h["id"]] * h["urgency"] * 2.5)
+                + (food_vars[h["id"]] * h["urgency"] * 1.2)
+                for h in hospitals
+            ]
+        ),
+        "Maximize_Priority_Value",
+    )
+
+    prob += (
+        lpSum([med_vars[h["id"]] for h in hospitals]) <= SUPPLY_MED,
+        "Supply_Limit_Med",
+    )
+    prob += (
+        lpSum([food_vars[h["id"]] for h in hospitals]) <= SUPPLY_FOOD,
+        "Supply_Limit_Food",
+    )
+    prob += (
+        lpSum([fuel_vars[h["id"]] for h in hospitals]) <= SUPPLY_FUEL,
+        "Supply_Limit_Fuel",
+    )
+
+    for h in hospitals:
+        prob += med_vars[h["id"]] <= h["med_demand"], f"Max_Med_{h['id']}"
+        prob += food_vars[h["id"]] <= h["food_demand"], f"Max_Food_{h['id']}"
+        prob += fuel_vars[h["id"]] <= h["fuel_demand"], f"Max_Fuel_{h['id']}"
+        
+        # Node-Specific Dynamic Payload Cap:
+        # Flooded/Blocked roads are restricted to Air Drone Payload (300kg).
+        # Open roads receive Ground Truck Payload (3000kg).
+        node_cap = 300.0 if h["road_accessible"] == 0 else 3000.0
+
+        prob += (
+            (med_vars[h["id"]] * WEIGHT_MED)
+            + (food_vars[h["id"]] * WEIGHT_FOOD)
+            + (fuel_vars[h["id"]] * WEIGHT_FUEL)
+        ) <= node_cap, f"Weight_Cap_{h['id']}"
+
+    prob.solve(pulp.PULP_CBC_CMD(msg=False))
+
+    status_str = LpStatus[prob.status]
+
+    output = {
+        "status": status_str,
+        "dispatch_mode": (
+            "AIR_RELIEF_DRONE" if target_mode == 1 else "GROUND_TRUCK"
+        ),
+        "payload_weight_cap_kg": 300.0 if target_mode == 1 else 3000.0,
+        "allocations": {},
+    }
+
+    for h in hospitals:
+        m_val = int(med_vars[h["id"]].varValue or 0)
+        f_val = int(food_vars[h["id"]].varValue or 0)
+        l_val = int(fuel_vars[h["id"]].varValue or 0)
+
+        total_kg = (m_val * WEIGHT_MED) + (f_val * WEIGHT_FOOD) + (l_val * WEIGHT_FUEL)
+
+        output["allocations"][h["id"]] = {
+            "name": h["name"],
+            "medical_kits": m_val,
+            "food_crates": f_val,
+            "fuel_liters": l_val,
+            "delivered_weight_kg": round(total_kg, 1),
+            "road_accessible": h["road_accessible"],
+            "distance_km": h["distance"],
+        }
+
+    return output
+
+
 if __name__ == "__main__":
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    base_dir = os.path.dirname(current_dir) if os.path.basename(current_dir) == "src" else current_dir
-    
-    csv_file = os.path.join(base_dir, "data", "city_nodes.csv")
-    nodes = load_city_nodes(csv_file)
-    result = run_lpp_allocation(nodes, target_mode=1)
-    
-    out_json = os.path.join(base_dir, "data", "allocated_supplies.json")
-    os.makedirs(os.path.dirname(out_json), exist_ok=True)
+    flood_node_flag = None
+    sim_rain_flag = None
+
+    if "--simulate-flood" in sys.argv:
+        idx = sys.argv.index("--simulate-flood")
+        if idx + 1 < len(sys.argv):
+            flood_node_flag = sys.argv[idx + 1]
+
+    if "--rain" in sys.argv:
+        idx = sys.argv.index("--rain")
+        if idx + 1 < len(sys.argv):
+            sim_rain_flag = sys.argv[idx + 1]
+
+    csv_file = os.path.join("data", "city_nodes.csv")
+    nodes, auto_mode = evaluate_route_telemetry(csv_file, flood_override_node=flood_node_flag, simulated_rain=sim_rain_flag)
+    result = run_lpp_allocation(nodes, target_mode=auto_mode)
+
+    out_json = os.path.join("data", "allocated_supplies.json")
     with open(out_json, "w", encoding="utf-8") as f:
         json.dump(result, f, indent=4)
-        
+
     print(f"[SUCCESS] Allocation output exported to: {out_json}")
