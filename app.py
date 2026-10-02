@@ -127,6 +127,8 @@ if "rain_slider" not in st.session_state:
     st.session_state["rain_slider"] = 0.0
 if "flood_select" not in st.session_state:
     st.session_state["flood_select"] = "None"
+if "map_view_type" not in st.session_state:
+    st.session_state["map_view_type"] = "Realistic GIS Map"
 
 
 def clear_all_alarms_callback():
@@ -135,6 +137,25 @@ def clear_all_alarms_callback():
     st.session_state["rain_slider"] = 0.0
     st.session_state["flood_select"] = "None"
 
+
+def create_map_trace(lat, lon, mode, marker, text, name):
+    """Helper to maintain version compatibility across Plotly Scattermap/Scattermapbox/Scatter."""
+    if hasattr(go, 'Scattermap'):
+        return go.Scattermap(lat=lat, lon=lon, mode=mode, marker=marker, text=text, name=name, hoverinfo="text")
+    elif hasattr(go, 'Scattermapbox'):
+        return go.Scattermapbox(lat=lat, lon=lon, mode=mode, marker=marker, text=text, name=name, hoverinfo="text")
+    else:
+        return go.Scatter(x=lon, y=lat, mode=mode, marker=marker, text=text, name=name, hoverinfo="text")
+
+
+# Bilingual Names Dictionary (English Primary + Malayalam Secondary)
+BILINGUAL_NAMES = {
+    "W1": "Base Depot W1 (കേന്ദ്ര ഡിപ്പോ W1)",
+    "H1": "H1: Metro General Hospital (മെട്രോ ജനറൽ ആശുപത്രി)",
+    "H2": "H2: St. Jude Clinic (സെന്റ് ജൂഡ് ക്ലിനിക്ക്)",
+    "H3": "H3: East Wing ER (ഈസ്റ്റ് വിംഗ് ഇ.ആർ)",
+    "H4": "H4: South Relief Hub (സൗത്ത് റിലീഫ് ഹബ്ബ്)"
+}
 
 # ---------------------------------------------------------
 # SIDEBAR CONTROLS & RED BRANDING
@@ -183,12 +204,12 @@ if view_mode == "Command Center Dashboard":
 # VIEW ROLE 2: HOSPITAL EMERGENCY TERMINAL
 # ---------------------------------------------------------
 if view_mode == "Hospital Emergency Terminal":
-    st.markdown("## Hospital Field Operations Terminal")
+    st.markdown("## Hospital Field Operations Terminal (ഫീൽഡ് ടെർമിനൽ)")
     st.divider()
     
     selected_hosp = st.selectbox(
         "Select Local Station Node:",
-        ["H1 - Metro General Hospital", "H2 - St. Jude Clinic", "H3 - East Wing ER", "H4 - South Relief Hub"]
+        ["H1 - Metro General Hospital (മെട്രോ ജനറൽ)", "H2 - St. Jude Clinic (സെന്റ് ജൂഡ്)", "H3 - East Wing ER (ഈസ്റ്റ് വിംഗ്)", "H4 - South Relief Hub (സൗത്ത് റിലീഫ്)"]
     )
     h_code = selected_hosp.split(" - ")[0]
     
@@ -253,77 +274,147 @@ else:
     col_left, col_right = st.columns([1.2, 1.0])
 
     with col_left:
-        st.markdown("#### Network Route Topology")
+        map_col_title, map_col_toggle = st.columns([1.2, 1.0])
+        with map_col_title:
+            st.markdown("#### Network Route Topology")
+        with map_col_toggle:
+            map_mode_selection = st.radio(
+                "Map Layer:",
+                ["Realistic GIS Map", "Schematic View"],
+                horizontal=True,
+                key="map_view_type"
+            )
 
-        warehouse_lat, warehouse_lon = 27.7172, 85.3240
+        # Kochi / Kerala GPS Center Coordinates
+        warehouse_lat, warehouse_lon = 9.9312, 76.2673
         fig_map = go.Figure()
 
-        # Base Node (Amber Square)
-        fig_map.add_trace(go.Scatter(
-            x=[warehouse_lon],
-            y=[warehouse_lat],
-            mode="markers+text",
-            marker=dict(size=22, color="#fbbf24", symbol="square", line=dict(width=2, color="#ffffff")),
-            text=["<b>Base W1</b>"],
-            textposition="top center",
-            name="Central Warehouse Base",
-            hoverinfo="text"
-        ))
+        is_gis_mode = (map_mode_selection == "Realistic GIS Map")
 
-        # Plot Hospitals & Individual Route Statuses
-        for h in nodes:
-            h_lat = warehouse_lat + (0.015 if h["id"] == "H1" else -0.012 if h["id"] == "H2" else 0.008 if h["id"] == "H3" else -0.020)
-            h_lon = warehouse_lon + (0.012 if h["id"] == "H1" else -0.015 if h["id"] == "H2" else 0.022 if h["id"] == "H3" else 0.005)
-            
-            is_blocked = (h["road_accessible"] == 0)
-            
-            if is_blocked:
-                line_color = "#f43f5e"
-                line_dash = "dot"
-                marker_symbol = "circle-x"
-                marker_color = "#f43f5e"
-                status_txt = "BLOCKED / FLOODED"
-            else:
-                line_color = "#10b981"
-                line_dash = "solid"
-                marker_symbol = "circle"
-                marker_color = "#10b981"
-                status_txt = "CLEAR / OPEN"
-
-            # Draw Route Line
-            fig_map.add_trace(go.Scatter(
-                x=[warehouse_lon, h_lon],
-                y=[warehouse_lat, h_lat],
-                mode="lines",
-                line=dict(width=3, color=line_color, dash=line_dash),
-                hoverinfo="none",
-                showlegend=False
-            ))
-
-            # Draw Hospital Node
-            fig_map.add_trace(go.Scatter(
-                x=[h_lon],
-                y=[h_lat],
+        # Base Node Trace
+        base_name_str = BILINGUAL_NAMES["W1"]
+        if is_gis_mode:
+            fig_map.add_trace(create_map_trace(
+                lat=[warehouse_lat],
+                lon=[warehouse_lon],
                 mode="markers+text",
-                marker=dict(size=16, color=marker_color, symbol=marker_symbol, line=dict(width=2, color="#ffffff")),
-                text=[f"<b>{h['id']}: {h['name']}</b><br>[{status_txt}]"],
-                textposition="bottom center",
-                name=f"Node {h['id']}",
+                marker=dict(size=22, color="#d97706"),
+                text=[f"<b>{base_name_str}</b>"],
+                name="Warehouse Base"
+            ))
+        else:
+            fig_map.add_trace(go.Scatter(
+                x=[warehouse_lon],
+                y=[warehouse_lat],
+                mode="markers+text",
+                marker=dict(size=22, color="#fbbf24", symbol="square", line=dict(width=2, color="#ffffff")),
+                text=[f"<b>{base_name_str}</b>"],
+                textposition="top center",
+                name="Warehouse Base",
                 hoverinfo="text"
             ))
 
-        fig_map.update_layout(
-            template="plotly_dark",
-            paper_bgcolor="#111827",
-            plot_bgcolor="#111827",
-            xaxis=dict(title="Longitude (GPS)", showgrid=True, gridcolor="#1f2937", zeroline=False, fixedrange=True),
-            yaxis=dict(title="Latitude (GPS)", showgrid=True, gridcolor="#1f2937", zeroline=False, fixedrange=True),
-            margin=dict(l=20, r=20, t=20, b=20),
-            height=410,
-            showlegend=False
+        # Hospital Nodes and Path Vectors (Kochi Offset Array)
+        for h in nodes:
+            if is_gis_mode:
+                h_lat = 9.965 if h["id"] == "H1" else 9.940 if h["id"] == "H2" else 9.980 if h["id"] == "H3" else 9.895
+                h_lon = 76.242 if h["id"] == "H1" else 76.305 if h["id"] == "H2" else 76.280 if h["id"] == "H3" else 76.255
+            else:
+                h_lat = warehouse_lat + (0.015 if h["id"] == "H1" else -0.012 if h["id"] == "H2" else 0.008 if h["id"] == "H3" else -0.020)
+                h_lon = warehouse_lon + (0.012 if h["id"] == "H1" else -0.015 if h["id"] == "H2" else 0.022 if h["id"] == "H3" else 0.005)
+
+            is_blocked = (h["road_accessible"] == 0)
+
+            if is_blocked:
+                line_color = "#dc2626"
+                line_dash = "dot"
+                marker_symbol = "circle-x"
+                marker_color = "#dc2626"
+                status_txt = "BLOCKED / FLOODED (തടസ്സപ്പെട്ടു)"
+            else:
+                line_color = "#16a34a" if auto_mode == 0 else "#ea580c"
+                line_dash = "solid"
+                marker_symbol = "circle"
+                marker_color = "#16a34a"
+                status_txt = "CLEAR / OPEN (തുറന്നിരിക്കുന്നു)"
+
+            h_bilingual_label = BILINGUAL_NAMES.get(h["id"], f"{h['id']}: {h['name']}")
+
+            # Draw Route Connection Line
+            if is_gis_mode:
+                fig_map.add_trace(create_map_trace(
+                    lat=[warehouse_lat, h_lat],
+                    lon=[warehouse_lon, h_lon],
+                    mode="lines",
+                    marker=dict(size=4, color=line_color),
+                    text=None,
+                    name=f"Path {h['id']}"
+                ))
+                fig_map.add_trace(create_map_trace(
+                    lat=[h_lat],
+                    lon=[h_lon],
+                    mode="markers+text",
+                    marker=dict(size=18, color=marker_color),
+                    text=[f"<b>{h_bilingual_label}</b><br>[{status_txt}]"],
+                    name=f"Node {h['id']}"
+                ))
+            else:
+                fig_map.add_trace(go.Scatter(
+                    x=[warehouse_lon, h_lon],
+                    y=[warehouse_lat, h_lat],
+                    mode="lines",
+                    line=dict(width=3, color=line_color, dash=line_dash),
+                    hoverinfo="none",
+                    showlegend=False
+                ))
+                fig_map.add_trace(go.Scatter(
+                    x=[h_lon],
+                    y=[h_lat],
+                    mode="markers+text",
+                    marker=dict(size=16, color=marker_color, symbol=marker_symbol, line=dict(width=2, color="#ffffff")),
+                    text=[f"<b>{h_bilingual_label}</b><br>[{status_txt}]"],
+                    textposition="bottom center",
+                    name=f"Node {h['id']}",
+                    hoverinfo="text"
+                ))
+
+        if is_gis_mode:
+            # CartoDB Voyager Tile Style: English geographic labels everywhere!
+            voyager_dict = dict(
+                style="carto-voyager",
+                zoom=11.4,
+                center=dict(lat=warehouse_lat, lon=warehouse_lon)
+            )
+            if hasattr(go, 'Scattermap'):
+                fig_map.update_layout(map=voyager_dict, margin=dict(l=0, r=0, t=0, b=0), height=410, showlegend=False)
+            elif hasattr(go, 'Scattermapbox'):
+                fig_map.update_layout(mapbox=voyager_dict, margin=dict(l=0, r=0, t=0, b=0), height=410, showlegend=False)
+        else:
+            fig_map.update_layout(
+                template="plotly_dark",
+                paper_bgcolor="#111827",
+                plot_bgcolor="#111827",
+                xaxis=dict(title="Longitude (GPS)", showgrid=True, gridcolor="#1f2937", zeroline=False, fixedrange=True),
+                yaxis=dict(title="Latitude (GPS)", showgrid=True, gridcolor="#1f2937", zeroline=False, fixedrange=True),
+                margin=dict(l=20, r=20, t=20, b=20),
+                height=410,
+                showlegend=False
+            )
+
+        st.plotly_chart(
+            fig_map,
+            use_container_width=True,
+            config={
+                'displayModeBar': True,
+                'scrollZoom': True,
+                'doubleClick': True,
+                'showTips': False
+            } if is_gis_mode else {
+                'displayModeBar': False,
+                'scrollZoom': False,
+                'doubleClick': False
+            }
         )
-        
-        st.plotly_chart(fig_map, use_container_width=True, config={'displayModeBar': False, 'scrollZoom': False, 'doubleClick': False})
 
     with col_right:
         st.markdown("#### Cargo Payload Distribution")
