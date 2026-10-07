@@ -1,221 +1,330 @@
 <div align="center">
 
-# ⚡ Project ASAP
+# Project ASAP
 ### Automated Supply & Air-relief Platform
 
-**An integrated Operations Research + Cybersecurity pipeline that turns a hospital's distress signal into a secured, optimized, scheduled drone relief mission in seconds.**
+**From distress signal to secured, optimized, scheduled drone relief mission in seconds.**
 
+*An integrated Operations Research + Cybersecurity decision engine for hospitals cut off by disaster.*
+
+[![Live App](https://img.shields.io/badge/Live%20Demo-Streamlit%20Cloud-FF4B4B?logo=streamlit&logoColor=white)](https://16701asap.streamlit.app/)
 ![Python](https://img.shields.io/badge/Python-3.8%2B-3776AB?logo=python&logoColor=white)
 ![C](https://img.shields.io/badge/C-GCC-A8B9CC?logo=c&logoColor=black)
-![Security](https://img.shields.io/badge/Security-AES--256%20%7C%20HMAC--SHA256-2E7D32)
+![Security](https://img.shields.io/badge/Security-AES--256--CBC%20%2B%20HMAC--SHA256-2E7D32)
 ![Domain](https://img.shields.io/badge/Domain-Operations%20Research-6A1B9A)
 ![Status](https://img.shields.io/badge/Status-Academic%20Prototype-F9A825)
+![License](https://img.shields.io/badge/License-MIT-blue)
 
-[Overview](#-overview) •
-[Features](#-key-features) •
-[Architecture](#-system-architecture) •
-[Quick Start](#-quick-start) •
-[Methodology](#-mathematical-methodology) •
-[Team](#-team)
+**[Try the Live Command Center](https://16701asap.streamlit.app/)** &nbsp;|&nbsp;
+[GitHub](https://github.com/SRReumah/ASAP) &nbsp;|&nbsp;
+[Quick Start](#quick-start) &nbsp;|&nbsp;
+[Architecture](#system-architecture) &nbsp;|&nbsp;
+[Methodology](#mathematical-methodology) &nbsp;|&nbsp;
+[Team](#the-team)
 
 </div>
 
 ---
 
-## 📖 Overview
+## Table of Contents
 
-### The Problem
-When a severe flood hits a city, roads go underwater, power fails, and communications degrade. Hospitals running ICUs and life-support on backup generators can run out of diesel within hours, and ground vehicles cannot reach them. Today, relief coordination in these moments is largely manual: someone has to decide **what** to send, **how** to send it, **when** to resupply, and **how long** it will take, all under extreme time pressure.
-
-### The Solution
-**Project ASAP** is an automated emergency-response "brain". A single distress broadcast from a hospital triggers a four-stage decision pipeline that:
-<img width="1913" height="801" alt="Screenshot 2026-10-02 020208" src="https://github.com/user-attachments/assets/4a6490dc-d67d-43bf-9ccb-40d69d42bf26" />
-<img width="1897" height="538" alt="Screenshot 2026-10-02 020234" src="https://github.com/user-attachments/assets/e40de7ce-c4d4-43ce-add5-5176d722615b" />
-<img width="1896" height="772" alt="Screenshot 2026-10-02 020246" src="https://github.com/user-attachments/assets/87e0d44d-66b7-46b6-b52b-2c7487c680f6" />
-
-| Question | Engine | Answer (reference scenario) |
-|---|---|---|
-| **How** do we get there safely? | Network Flow & Security (C) | Roads blocked → switch to air; 12 km shortest path; AES-256 encrypted telemetry |
-| **What** do we send? | Cargo Optimizer (ILP) | Optimal mix of fuel, medical kits and food within a 300 kg payload |
-| **When** do we resupply? | Inventory Control (EOQ) | Reorder alert at 65 L, protected by a 35 L safety buffer |
-| **How long** will it take? | Flight Scheduler (PERT/CPM) | Round-trip mission loop of 76.33 minutes, bottleneck identified |
-
-Every result is computed live by real backend engines, written to disk as artifacts, and visualized in an interactive **Command Center Dashboard**.
+1. [The Pitch in 30 Seconds](#the-pitch-in-30-seconds)
+2. [The Problem](#the-problem)
+3. [Our Solution](#our-solution)
+4. [Who It Is For](#who-it-is-for)
+5. [Key Features](#key-features)
+6. [Demo Walkthrough](#demo-walkthrough)
+7. [System Architecture](#system-architecture)
+8. [Tech Stack](#tech-stack)
+9. [Quick Start](#quick-start)
+10. [Mathematical Methodology](#mathematical-methodology)
+11. [Security Model](#security-model)
+12. [Repository Structure](#repository-structure)
+13. [Engineering Decisions](#engineering-decisions)
+14. [Known Limitations](#known-limitations)
+15. [Roadmap](#roadmap)
+16. [The Team](#the-team)
+17. [Contributing](#contributing)
+18. [Disclaimer and License](#disclaimer-and-license)
 
 ---
 
-## ✨ Key Features
+## The Pitch in 30 Seconds
 
-- **Intelligent mode switching** - detects flooded road segments and automatically reroutes from ground transport to air-relief drones.
-- **Tamper-resistant telemetry** - drone command packets are encrypted with AES-256-CBC and signed with an HMAC-SHA256 integrity tag, packed into a fixed 109-byte binary struct.
-- **Optimal cargo packing** - Integer Linear Programming maximizes priority-weighted relief value under strict payload limits.
-- **Predictive fuel alarms** - EOQ and statistical safety-stock models trigger reorders before a hospital reaches a critical level.
-- **Mission timeline forecasting** - PERT/CPM computes expected durations, variance, slack and the critical path of every flight loop.
-- **Live command dashboard** - dual-view UI (Hospital phone unit / Command Center laptop) backed by a Python API server that executes the real engines on demand.
-- **Modular by design** - each engine runs standalone for testing and review, or chained together as a full pipeline.
+> A flooded city. Roads underwater. A hospital ICU running on a diesel generator with hours of fuel left.
+>
+> Today, getting it help means phone calls, spreadsheets, and guesswork under pressure.
+>
+> **Project ASAP replaces that with one button.** A hospital sends a distress signal, and ASAP decides *how* to reach it, *what* to send, *when* to resupply, and *how long* it will take. It then encrypts the mission and shows everything on a live map.
+
+| | Manual Coordination | Project ASAP |
+|---|---|---|
+| Route decision | Radio calls, local knowledge | Dijkstra shortest path with automatic air/ground switching |
+| Cargo choice | Best guess | Integer Linear Programming, provably optimal for the scenario |
+| Resupply timing | Reactive, after shortage | Predictive reorder alert before generator failure |
+| Mission timing | Rough estimate | PERT/CPM with critical path and variance |
+| Data integrity | Unsecured messages | AES-256 encryption + HMAC-SHA256 tamper detection |
+| Time to decision | Minutes to hours | Seconds |
+
+---
+
+## The Problem
+
+When severe flooding or natural disasters strike:
+
+- **Roads submerge**, cutting hospitals off from ground logistics.
+- **Power grids fail**, forcing ICUs and life support onto backup diesel generators that burn through fuel quickly.
+- **Communications degrade**, and the messages that do get through can be spoofed or corrupted.
+- **Coordinators decide under pressure**, often manually and with incomplete information, which leads to wrong cargo, late resupply, and wasted flights.
+
+Every one of these is a well-studied problem in Operations Research. What is missing is a system that solves them **together, automatically, and securely**.
+
+---
+
+## Our Solution
+
+Project ASAP is an automated emergency-response "brain". A single distress broadcast triggers a four-stage decision pipeline:
+
+| Question | Engine | Answer (Reference Scenario) |
+|---|---|---|
+| **How** do we get there safely? | Network Flow, Risk & Security (C / Python) | Roads blocked, so switch to air drones; 12 km shortest path; AES-256 encrypted telemetry |
+| **What** do we send? | Cargo Optimizer (Integer LPP) | Optimal mix of fuel, medical kits and food within strict weight caps (300 kg air / 3000 kg ground) |
+| **When** do we resupply? | Inventory Control (EOQ) | Reorder alert at 65 L, protected by a 35 L safety buffer |
+| **How long** will it take? | Flight Scheduler (PERT/CPM) | 76.33 min round-trip mission loop with critical bottleneck path identified |
+
+Every result is computed live by backend engines, written to disk as physical artifacts (`.json`, `.bin`), and visualized in an interactive **GIS Command Center** with bilingual station labels (English and Malayalam).
+
+---
+
+## Who It Is For
+
+| Persona | Pain Today | What ASAP Gives Them |
+|---|---|---|
+| **Disaster response coordinator** (district / state emergency ops) | Juggling many hospitals, routes and vehicles at once | One dashboard with ranked, optimized missions |
+| **Hospital administrator** | No visibility into when help arrives or what is coming | A distress button plus predictable resupply alerts |
+| **Drone / logistics operator** | Unclear payloads and unsafe routes | Weight-capped cargo plans and a timed flight schedule |
+| **Security / IT officer** | Mission data sent in the clear | Encrypted, integrity-checked telemetry packets |
+| **Students and researchers** | OR techniques taught in isolation | A working reference showing ILP, EOQ, PERT/CPM and Dijkstra chained together |
+
+---
+
+## Key Features
+
+- **Intelligent Mode Switching and GIS Mapping**
+  Detects flooded road segments using staggered rainfall thresholds and automatically reroutes from ground trucks to air relief drones on Carto-Voyager GIS maps.
+
+- **Tamper-Resistant Telemetry**
+  Encrypts mission parameters with AES-256-CBC and signs them with an HMAC-SHA256 integrity tag inside a 109-byte packed binary struct.
+
+- **Multi-Scenario Cargo Optimization**
+  Solves Integer Linear Programming cargo packing for three disaster profiles: **Power Grid Blackout**, **Mass Trauma Surge**, and **Balanced Relief**.
+
+- **Predictive Fuel Reserves**
+  Uses Economic Order Quantity and statistical safety-stock models to raise reorder alerts *before* a generator runs dry.
+
+- **Mission Timeline Forecasting**
+  PERT/CPM engine computes expected task durations, variance, slack, and the critical path (A, D, E, F).
+
+- **Triple-Layer Fault Tolerance**
+  Runs on Streamlit Cloud, locally, or on a zero-dependency HTML/JS fallback server, so the dashboard stays available even if one layer fails.
+
+---
+
+## Demo Walkthrough
+
+Try this on the [live app](https://16701asap.streamlit.app/) in under two minutes:
+
+1. **Trigger the emergency.** Send a distress signal from a hospital station (phone unit view) or raise rainfall on the GIS map.
+2. **Watch the route change.** Flooded road edges drop out of the network and the mode switches from Ground to Air.
+3. **Pick a scenario.** Switch between Power Grid Blackout, Mass Trauma Surge and Balanced Relief, and watch the payload bars rebalance.
+4. **Check the reserves.** See the fuel level against the 65 L reorder point and 35 L safety buffer.
+5. **Read the timeline.** Review the PERT chart, the critical path, and the 76.33 minute mission loop.
+6. **Inspect the proof.** Open `data/allocated_supplies.json` and `data/telemetry_packet.bin` to see the artifacts each engine produced.
+
+> **Screenshots:** add images to `docs/images/` and reference them here, for example:
+> `![Command Center](docs/images/command_center.png)`
 
 ---
 
 ## System Architecture
 
-The platform consists of four independent backend engines executed sequentially by a central API server. Each engine produces a physical data artifact consumed by the dashboard.
+Four independent engines run in sequence under a central orchestrator. Each engine writes a physical artifact that the next stage and the dashboard consume.
 
 ```mermaid
 flowchart TD
-    A["🏥 Hospital Distress Signal<br/>(Phone: Hospital Unit)"] --> S["🖧 server.py<br/>Python API Server · localhost:8000"]
-    S --> M2["① Network Flow & Security Engine<br/>c_core/net_crypto_core.c<br/>Dijkstra · Mode Switch · AES-256 · HMAC"]
-    M2 -->|"data/telemetry_packet.bin"| M1["② Cargo Allocation Solver<br/>src/01_lpp_allocation.py<br/>Integer Linear Programming"]
-    M1 -->|"data/allocated_supplies.json"| M3["③ Inventory & Safety Stock<br/>src/03_inventory.py<br/>EOQ · Safety Stock · ROP"]
-    M3 --> M4["④ Flight Loop Scheduler<br/>src/04_pert_schedule.py<br/>PERT · CPM · Slack Analysis"]
-    M4 --> D[" Command Center Dashboard<br/>index.html"]
+    A["Hospital Distress Signal / Rainfall Obstacle<br/>(Phone Unit / GIS Trigger)"] --> S["app.py / server.py<br/>Master Orchestrator & API Middleware"]
+    S --> M2["Network Flow & Security Engine<br/>c_core/net_crypto_core.c + src/02_route_risk.py<br/>Dijkstra, Mode Switch, AES-256, HMAC"]
+    M2 -->|"data/telemetry_packet.bin"| M1["Cargo Allocation Solver<br/>src/01_lpp_allocation.py<br/>Integer Linear Programming"]
+    M1 -->|"data/allocated_supplies.json"| M3["Inventory & Safety Stock<br/>src/03_inventory.py<br/>EOQ, Safety Stock, ROP"]
+    M3 --> M4["Flight Loop Scheduler<br/>src/04_pert_schedule.py<br/>PERT, CPM, Critical Path"]
+    M4 --> D["Command Center Dashboard<br/>GIS Map, Payload Bars, Timeline Gauges"]
 ```
 
-<details>
-<summary><b>Plain-text architecture diagram</b> (for viewers without Mermaid support)</summary>
+### Pipeline Contract
 
-```text
-                ┌──────────────────────────────────────────┐
-                │     Hospital Distress Signal Broadcast   │
-                └────────────────────┬─────────────────────┘
-                                     │
-                                     ▼
-┌──────────────────────────────────────────────────────────────────────────┐
-│ ① Network Flow & Security Engine          c_core/net_crypto_core.c       │
-│   • Dijkstra shortest path (12 km)  • Air vs. ground mode switching      │
-│   • AES-256-CBC payload encryption  • HMAC-SHA256 integrity tag          │
-│   └─► data/telemetry_packet.bin  (109-byte packed binary struct)         │
-└────────────────────────────────────┬─────────────────────────────────────┘
-                                     ▼
-┌──────────────────────────────────────────────────────────────────────────┐
-│ ② Cargo Allocation Solver (ILP)           src/01_lpp_allocation.py       │
-│   • Priority-weighted relief value maximization                          │
-│   • 300 kg air payload constraint across multi-commodity demand          │
-│   └─► data/allocated_supplies.json                                       │
-└────────────────────────────────────┬─────────────────────────────────────┘
-                                     ▼
-┌──────────────────────────────────────────────────────────────────────────┐
-│ ③ Inventory & Safety Stock Control        src/03_inventory.py            │
-│   • Economic Order Quantity and daily fuel burn                          │
-│   • Safety stock 35 L  •  Reorder point 65 L                             │
-└────────────────────────────────────┬─────────────────────────────────────┘
-                                     ▼
-┌──────────────────────────────────────────────────────────────────────────┐
-│ ④ PERT/CPM Flight Loop Scheduler          src/04_pert_schedule.py        │
-│   • Expected durations and variance  • Forward/backward pass slack       │
-│   • Critical path A → D → E → F  =  76.33 minutes                        │
-└──────────────────────────────────────────────────────────────────────────┘
-```
+| Stage | Input | Output Artifact | Consumed By |
+|---|---|---|---|
+| 1. Network Flow & Security | `data/city_nodes.csv`, rainfall / flood state | `data/telemetry_packet.bin` (109 bytes) | Cargo solver, dashboard |
+| 2. Cargo Allocation (ILP) | Transport mode, payload cap, scenario weights | `data/allocated_supplies.json` | Inventory engine, dashboard |
+| 3. Inventory Control | Fuel burn rate, lead time, delivered fuel | Reorder status, safety stock | Scheduler, dashboard |
+| 4. PERT/CPM Scheduler | Task time estimates (a, m, b) | Critical path, mission duration | Dashboard |
 
-</details>
+---
 
-### Tech Stack
+## Tech Stack
 
 | Layer | Technology |
 |---|---|
-| Routing & security core | C (GCC), Dijkstra's algorithm, AES-256-CBC, HMAC-SHA256 |
-| Optimization & analytics | Python 3.8+ (ILP, EOQ, PERT/CPM) |
-| API server | Python HTTP server (`server.py`) |
-| Frontend | HTML / CSS / JavaScript (`index.html`) |
-| Data exchange | CSV, JSON, packed binary |
+| Routing & Security Core | C (GCC), Dijkstra's Algorithm, AES-256-CBC, HMAC-SHA256 |
+| Optimization & Analytics | Python 3.8+ (bounded integer ILP solver, EOQ, PERT/CPM) |
+| GIS & Dashboards | Streamlit, Plotly (Carto-Voyager tiles), Pandas, Leaflet.js |
+| API Middleware | Python HTTP server (`server.py`, `app.py`) |
+| Data Artifacts | CSV, JSON, packed binary (`.bin`) |
+| Deployment | Streamlit Community Cloud, local, static HTML fallback |
 
 ---
 
 ## Quick Start
 
 ### Prerequisites
-- **Python 3.8+**
-- **GCC** (only needed if you want to recompile the C core; a pre-compiled Windows binary is included)
+
+- Python 3.8 or newer
+- GCC (optional; a pre-compiled Windows executable is included in `c_core/`)
 
 ### 1. Clone the repository
+
 ```bash
-git clone https://github.com/<your-username>/ASAP.git
+git clone https://github.com/SRReumah/ASAP.git
 cd ASAP
 ```
 
-### 2. (Optional) Compile the C core
-```bash
-gcc -O2 -o c_core/net_crypto_core.exe c_core/net_crypto_core.c
-```
-> If your build links against OpenSSL for the cryptographic routines, append `-lcrypto`.
+### 2. Install dependencies
 
-### 3. Launch the platform
+```bash
+pip install -r requirements.txt
+```
+
+### 3. Launch the Command Center
+
+```bash
+streamlit run app.py
+```
+
+Open `http://localhost:8501` in your browser.
+
+### Alternative Run Modes
+
+<details>
+<summary><b>Option B: Offline native server (no Streamlit needed)</b></summary>
+
 ```bash
 python server.py
 ```
-The API server starts at **http://localhost:8000** and opens the Command Center in your default browser.
 
-### 4. Run the live demo
-1. In the top-right view selector, switch to **Phone: Hospital Unit**.
-2. Click **BROADCAST EMERGENCY DISTRESS SIGNAL**.
-3. The view automatically switches to **Laptop: Command Center**.
-4. Watch your terminal as `server.py` executes each engine in sequence. The dashboard populates with real values read from the generated artifacts.
+Opens `index.html` at `http://localhost:8000` automatically.
+</details>
 
-### 5. Run engines individually
-Each engine can be executed on its own for testing or code review:
+<details>
+<summary><b>Option C: Run each engine on its own</b></summary>
 
 ```powershell
-# ① Network Flow & Security Engine (C)
+# Network Flow & Security Engine (C, Windows binary)
 .\c_core\net_crypto_core.exe 1 0
 
-# ② Cargo Allocation Solver
+# Route Risk Assessment Engine
+python src/02_route_risk.py
+
+# Multi-Scenario Cargo Allocation Solver
 python src/01_lpp_allocation.py
 
-# ③ Inventory & Safety Stock Control
+# Inventory & Safety Stock Control
 python src/03_inventory.py
 
-# ④ PERT/CPM Flight Loop Scheduler
+# PERT/CPM Flight Loop Scheduler
 python src/04_pert_schedule.py
 ```
+</details>
+
+<details>
+<summary><b>Building the C core on Linux or macOS</b></summary>
+
+```bash
+gcc c_core/net_crypto_core.c -o c_core/net_crypto_core
+./c_core/net_crypto_core 1 0
+```
+
+If the core links against an external crypto library (for example OpenSSL), add the matching flag such as `-lcrypto`.
+</details>
 
 ---
 
-## 🔬 Mathematical Methodology
+## Mathematical Methodology
 
-### ① Network Routing & Cryptography
-**Dijkstra's shortest path.** For each edge $(u, v)$ with weight $w(u,v)$, a distance is relaxed when:
+<details open>
+<summary><b>1. Network Routing (Dijkstra)</b></summary>
+
+For each edge $(u, v)$ with weight $w(u,v)$, distance is relaxed when:
 
 $$d(v) > d(u) + w(u, v) \;\Rightarrow\; d(v) \leftarrow d(u) + w(u, v)$$
 
-Edges flagged as flooded are removed from the ground network, triggering a switch to the air network.
+Edges whose flood level exceeds their threshold are removed from the ground network. If no ground path remains, the system switches to air relief mode.
+</details>
 
-**Secure telemetry.** The mission payload is encrypted with **AES-256-CBC** and authenticated with an **HMAC-SHA256** tag. Both are serialized into a 109-byte packed struct (`data/telemetry_packet.bin`), so any in-flight tampering invalidates the tag.
+<details open>
+<summary><b>2. Cargo Optimization (Integer Linear Programming)</b></summary>
 
-### ② Integer Linear Programming (Cargo Allocation)
-**Objective:** maximize priority-weighted relief utility across hospitals $h \in H$ with urgency weight $U_h$:
+**Objective:** maximize priority-weighted relief value across stations $h \in H$ with urgency score $U_h$:
 
-$$\max Z = \sum_{h \in H} U_h \left( 3.0\,x_h^{\text{fuel}} + 2.5\,x_h^{\text{med}} + 1.2\,x_h^{\text{food}} \right)$$
+$$\max Z = \sum_{h \in H} U_h \left( w_{\text{fuel}} \, x_h^{\text{fuel}} + w_{\text{med}} \, x_h^{\text{med}} + w_{\text{food}} \, x_h^{\text{food}} \right)$$
 
-**Subject to** the drone payload cap:
+**Subject to the payload ceiling:**
 
-$$0.85\,x_h^{\text{fuel}} + 12.0\,x_h^{\text{med}} + 25.0\,x_h^{\text{food}} \le 300 \text{ kg}$$
+$$0.85\,x_h^{\text{fuel}} + 12.0\,x_h^{\text{med}} + 25.0\,x_h^{\text{food}} \le \text{CAP}_{\text{payload}} \quad (300\text{ kg Air} \;/\; 3000\text{ kg Ground})$$
 
 $$x_h^{\text{fuel}},\; x_h^{\text{med}},\; x_h^{\text{food}} \in \mathbb{Z}_{\ge 0}$$
 
-| Commodity | Unit | Unit weight | Priority weight |
+| Commodity | Unit | Unit Weight | Scenario Weight (Power / Medical / Balanced) |
 |---|---|---|---|
-| Generator fuel | Litre | 0.85 kg | 3.0 |
-| Medical kit | Kit | 12.0 kg | 2.5 |
-| Food crate | Crate | 25.0 kg | 1.2 |
+| Generator Fuel | Litre | 0.85 kg | 5.0 / 1.0 / 3.0 |
+| Medical Kit | Kit | 12.0 kg | 1.0 / 5.0 / 2.5 |
+| Food Crate | Crate | 25.0 kg | 1.0 / 1.0 / 1.2 |
+</details>
 
-### ③ Inventory Control & Fuel Safety Stock
+<details open>
+<summary><b>3. Inventory Control & Safety Stock</b></summary>
 
-| Metric | Formula | Reference value |
+| Metric | Formula | Reference Value |
 |---|---|---|
-| Economic Order Quantity | $EOQ = \sqrt{\dfrac{2DS}{H}}$ | — |
-| Safety Stock | $SS = Z \cdot \sigma_d \cdot \sqrt{L} = 1.65 \times 12.0 \times \sqrt{3}$ | ≈ 34.3 → **35 L** (rounded up) |
-| Reorder Point | $ROP = (\bar{d} \cdot L) + SS$ | **65 L** |
+| Economic Order Quantity | $\text{EOQ} = \sqrt{\dfrac{2DS}{H}}$ | Dynamic |
+| Safety Stock | $\text{SS} = Z \cdot \sigma_d \cdot \sqrt{L} = 1.65 \times 12.0 \times \sqrt{3}$ | $\approx 34.3 \rightarrow$ **35 L** |
+| Reorder Point | $\text{ROP} = \bar{d} \cdot L + \text{SS}$ | **65 L** |
 
-Where $D$ = annual demand, $S$ = ordering cost, $H$ = holding cost, $Z = 1.65$ (≈95% service level), $\sigma_d$ = daily demand standard deviation, $L$ = lead time in days, and $\bar{d}$ = average daily fuel burn.
+$Z = 1.65$ corresponds to roughly a 95% service level. With a 3-day lead time, the 65 L reorder point implies an average burn of 10 L/day (30 L lead-time demand plus 35 L safety stock).
+</details>
 
-### ④ PERT/CPM Project Scheduling
+<details open>
+<summary><b>4. PERT/CPM Flight Scheduling</b></summary>
 
-| Metric | Formula |
-|---|---|
-| Expected activity time | $T_e = \dfrac{a + 4m + b}{6}$ |
-| Activity variance | $\sigma^2 = \left(\dfrac{b - a}{6}\right)^2$ |
-| Slack | $\text{Slack} = LS - ES$ |
+| Metric | Formula | Meaning |
+|---|---|---|
+| Expected Task Time | $T_e = \dfrac{a + 4m + b}{6}$ | Weighted average of optimistic, most likely and pessimistic times |
+| Task Variance | $\sigma^2 = \left(\dfrac{b - a}{6}\right)^2$ | Uncertainty spread |
+| Slack | $\text{Slack} = \text{LS} - \text{ES}$ | Zero slack means the task is on the critical path |
 
-Activities with zero slack form the **critical path**: **A → D → E → F**, giving an expected mission loop of **76.33 minutes**.
+The zero-slack sequence **A, D, E, F** forms the critical path, giving a non-delayable mission round trip of **76.33 minutes**.
+</details>
+
+---
+
+## Security Model
+
+| Property | Mechanism | What It Protects Against |
+|---|---|---|
+| Confidentiality | AES-256-CBC | Interception of mission parameters (destination, cargo, timing) |
+| Integrity & authenticity | HMAC-SHA256 tag | Tampered or spoofed telemetry packets |
+| Compact transport | 109-byte packed binary struct | Bandwidth limits on degraded links |
+
+**Prototype scope:** keys are handled for demonstration purposes. A production deployment would need proper key management (secure storage, rotation, per-device keys), a fresh random IV per packet, encrypt-then-MAC verification before decryption, and replay protection (timestamps or nonces).
 
 ---
 
@@ -223,57 +332,101 @@ Activities with zero slack form the **critical path**: **A → D → E → F**, 
 
 ```text
 ASAP/
+├── app.py                      # Master Streamlit GIS Command Center
+├── server.py                   # Python HTTP API server & middleware
+├── index.html                  # Dual-view web command center (phone / laptop UI)
+├── requirements.txt            # Python dependencies
 ├── c_core/
-│   ├── net_crypto_core.c        # ① Routing, mode switching & AES/HMAC security engine
-│   └── net_crypto_core.exe      # Pre-compiled binary (Windows)
+│   ├── net_crypto_core.c       # Routing, mode switch & AES-256/HMAC engine
+│   └── net_crypto_core.exe     # Pre-compiled Windows binary
 ├── data/
-│   ├── city_nodes.csv           # Shared hospital & base node dataset
-│   ├── telemetry_packet.bin     # Output of ① (109-byte encrypted packet)
-│   └── allocated_supplies.json  # Output of ② (optimal cargo plan)
-├── src/
-│   ├── 01_lpp_allocation.py     # ② ILP cargo allocation solver
-│   ├── 03_inventory.py          # ③ Inventory & safety stock engine
-│   └── 04_pert_schedule.py      # ④ PERT/CPM flight loop scheduler
-├── index.html                   # Command Center dashboard
-├── server.py                    # Python API server & pipeline orchestrator
-└── README.md
+│   ├── city_nodes.csv          # Station nodes: coordinates, demand, flood limits
+│   ├── allocated_supplies.json # Output of the ILP cargo solver
+│   └── telemetry_packet.bin    # Output of the C security engine (109 bytes)
+└── src/
+    ├── 01_lpp_allocation.py    # Multi-scenario ILP cargo allocation
+    ├── 02_route_risk.py        # GIS route risk & telemetry assessment
+    ├── 03_inventory.py         # Inventory control & EOQ
+    └── 04_pert_schedule.py     # PERT/CPM flight loop scheduler
 ```
 
 ---
 
-## Team
+## Engineering Decisions
 
-| Module | Owner | Responsibility |
-|---|---|---|
-| ① Network Flow & Security (C) | **Member 2** – _Name_ | Routing, mode switching, encryption, packet design |
-| ② Cargo Allocation (ILP) | **Member 1** – _Name_ | Payload optimization model |
-| ③ Inventory Control | **Member 3** – _Name_ | Fuel burn, EOQ, safety stock, reorder alerts |
-| ④ Flight Scheduling (PERT/CPM) | **Member 4** – _Name_ | Mission timeline and critical path analysis |
+| Decision | Why |
+|---|---|
+| **C for routing and crypto** | Fast, low-level control over the packed binary struct; mirrors how embedded drone firmware would handle telemetry. |
+| **Python for optimization** | Clear, readable OR models that are easy to verify against textbook formulas. |
+| **File artifacts between stages** | Each engine can be run, tested and debugged on its own; outputs are inspectable evidence. |
+| **Three run modes** | A disaster tool must not depend on a single server; the HTML fallback works with no installs. |
+| **Bilingual labels** | Local responders read station names in their own language (Malayalam alongside English). |
+
+---
+
+## Known Limitations
+
+We would rather be clear about these than overclaim:
+
+- **Simulated data.** Station locations, demands and flood thresholds are synthetic.
+- **Single-vehicle model.** The ILP plans one payload per mission; fleet-level routing (VRP) is not yet modelled.
+- **Static weights.** Scenario weights are hand-set rather than learned from real incident data.
+- **No aviation compliance.** Drone flight rules, airspace permissions and weather limits are out of scope.
+- **Prototype cryptography.** See [Security Model](#security-model) for what production would require.
+- **Windows-first binary.** The bundled C executable targets Windows; other platforms must compile from source.
 
 ---
 
 ## Roadmap
 
-- [ ] Real-time flood data ingestion (GIS / weather APIs) to replace static road status
-- [ ] Multi-drone fleet allocation and simultaneous missions
-- [ ] Hospital-side IoT fuel sensors feeding live burn rates
-- [ ] Key management and rotation for the telemetry encryption layer
-- [ ] Containerized deployment (Docker) and cross-platform builds
+| Phase | Goal | Highlights |
+|---|---|---|
+| **v1.0 (current)** | Academic prototype | Four engines, live dashboard, encrypted telemetry |
+| **v1.5** | Fleet scale | Multi-drone Vehicle Routing Problem, multiple hospitals per mission |
+| **v2.0** | Real data | Live rainfall / flood feeds, real road networks via OpenStreetMap |
+| **v2.5** | Field readiness | Key management, replay protection, offline mobile app for hospitals |
+| **v3.0** | Pilot | Partnership with a disaster management authority or NGO for a tabletop exercise |
 
 ---
 
-## ⚠️ Disclaimer
+## The Team
 
-Project ASAP is an **academic prototype** built to demonstrate the integration of Operations Research and cybersecurity techniques. It uses simulated data and has not been validated for real-world emergency operations, aviation compliance, or production-grade security.
+Project ASAP was built by a team of four, each owning one engine end to end.
+
+| Member | Module | Ownership |
+|---|---|---|
+| **[Member 1 Name]** ([@github-handle](https://github.com/)) | Module 1: LPP Cargo Allocation | Linear programming, multi-commodity payload optimization, scenario weights |
+| **[Member 2 Name]** ([@github-handle](https://github.com/)) | Module 2: Network Flow & Security | Dijkstra shortest path, flood risk thresholds, AES-256/HMAC cryptography |
+| **[Member 3 Name]** ([@github-handle](https://github.com/)) | Module 3: Inventory Control | Fuel burn modelling, EOQ, safety reserve alarms |
+| **[Member 4 Name]** ([@github-handle](https://github.com/)) | Module 4: PERT/CPM Flight Scheduler | Task variance, forward/backward passes, critical path analysis |
+
+**Shared work:** system integration, the Streamlit Command Center, the HTML fallback server, and deployment.
 
 ---
 
-## License
+## Contributing
 
-Distributed under the MIT License. See `LICENSE` for details.
+Ideas, issues and pull requests are welcome.
+
+1. Fork the repository.
+2. Create a branch: `git checkout -b feature/your-idea`
+3. Commit your changes with a clear message.
+4. Open a pull request describing what changed and why.
+
+Good first contributions: real-world datasets, unit tests for each engine, a Linux/macOS build script, and screenshots for this README.
+
+---
+
+## Disclaimer and License
+
+Project ASAP is an **academic prototype** that demonstrates how Operations Research, GIS modelling and cybersecurity can work together. It uses simulated disaster data and has not been evaluated for civil aviation compliance or production-grade cryptographic deployment. Do not use it for real emergency operations.
+
+Distributed under the **MIT License**. See `LICENSE` for details.
 
 <div align="center">
 
-**Built to get help where it's needed - ASAP.**
+**Built to deliver relief where it is needed most, ASAP.**
+
+[Try the Live Demo](https://16701asap.streamlit.app/) &nbsp;|&nbsp; Star the repo if you found it useful
 
 </div>
