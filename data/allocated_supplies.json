@@ -1,15 +1,15 @@
 {
     "status": "Optimal",
-    "dispatch_mode": "GROUND_TRUCK",
-    "payload_weight_cap_kg": 3000.0,
+    "dispatch_mode": "AIR_RELIEF_DRONE",
+    "payload_weight_cap_kg": 300.0,
     "allocations": {
         "H1": {
             "name": "Metro_General",
-            "medical_kits": 150,
-            "food_crates": 31,
-            "fuel_liters": 500,
-            "delivered_weight_kg": 3000.0,
-            "road_accessible": 1,
+            "medical_kits": 0,
+            "food_crates": 0,
+            "fuel_liters": 352,
+            "delivered_weight_kg": 299.2,
+            "road_accessible": 0,
             "distance_km": 2.12
         },
         "H2": {
