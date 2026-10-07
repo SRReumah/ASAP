@@ -491,7 +491,7 @@ else:
     ])
 
     with tab1:
-        st.markdown("##### Member 1: Optimized Cargo Allocation Matrix (PuLP Solver)")
+        st.markdown("##### Member 1: Optimized Cargo Allocation Matrix (Integer LP Solver)")
         
         table_rows = []
         for h_id, data in allocations.items():
