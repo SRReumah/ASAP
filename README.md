@@ -22,6 +22,12 @@
 [Methodology](#mathematical-methodology) &nbsp;|&nbsp;
 [Team](#the-team)
 
+<br/><br/>
+
+<img src="images/image1.png" alt="ASAP Disaster Relief Command Center: live GIS route map of Kochi with cargo payload distribution per hospital" width="100%"/>
+
+<sub><i>The ASAP Command Center: live GIS routing from Base Depot W1 to four hospitals in Kochi, with optimized cargo per station.</i></sub>
+
 </div>
 
 ---
@@ -90,7 +96,7 @@ Project ASAP is an automated emergency-response "brain". A single distress broad
 | **How** do we get there safely? | Network Flow, Risk & Security (C / Python) | Roads blocked, so switch to air drones; 12 km shortest path; AES-256 encrypted telemetry |
 | **What** do we send? | Cargo Optimizer (Integer LPP) | Optimal mix of fuel, medical kits and food within strict weight caps (300 kg air / 3000 kg ground) |
 | **When** do we resupply? | Inventory Control (EOQ) | Reorder alert at 65 L, protected by a 35 L safety buffer |
-| **How long** will it take? | Flight Scheduler (PERT/CPM) | 76.33 min round-trip mission loop with critical bottleneck path identified |
+| **How long** will it take? | Flight Scheduler (PERT/CPM) | 76.33 min air round trip (115 min by ground truck) with the critical bottleneck path identified |
 
 Every result is computed live by backend engines, written to disk as physical artifacts (`.json`, `.bin`), and visualized in an interactive **GIS Command Center** with bilingual station labels (English and Malayalam).
 
@@ -132,17 +138,41 @@ Every result is computed live by backend engines, written to disk as physical ar
 
 ## Demo Walkthrough
 
-Try this on the [live app](https://16701asap.streamlit.app/) in under two minutes:
+Follow along on the [live app](https://16701asap.streamlit.app/). The app has two views, switched from the sidebar: the **Hospital Emergency Terminal** (the hospital's side) and the **Command Center Dashboard** (the coordinator's side).
 
-1. **Trigger the emergency.** Send a distress signal from a hospital station (phone unit view) or raise rainfall on the GIS map.
-2. **Watch the route change.** Flooded road edges drop out of the network and the mode switches from Ground to Air.
-3. **Pick a scenario.** Switch between Power Grid Blackout, Mass Trauma Surge and Balanced Relief, and watch the payload bars rebalance.
-4. **Check the reserves.** See the fuel level against the 65 L reorder point and 35 L safety buffer.
-5. **Read the timeline.** Review the PERT chart, the critical path, and the 76.33 minute mission loop.
-6. **Inspect the proof.** Open `data/allocated_supplies.json` and `data/telemetry_packet.bin` to see the artifacts each engine produced.
+### Step 1: A hospital raises the alarm
 
-> **Screenshots:** add images to `docs/images/` and reference them here, for example:
-> `![Command Center](docs/images/command_center.png)`
+Metro General Hospital (H1) is on 15% diesel with about 2.5 hours of generator time left, and its ICU supplies are critically low. The terminal shows the alert in English and Malayalam.
+
+<img src="images/image7.png" alt="Hospital Field Operations Terminal showing critical alert at node H1, 15 percent diesel remaining and critical ICU supply depletion" width="100%"/>
+
+### Step 2: One button sends the distress signal
+
+Pressing **Broadcast Emergency Distress Signal** notifies central dispatch instantly.
+
+<img src="images/image8.png" alt="Distress signal broadcast confirmation for node H1 with central dispatch notified" width="100%"/>
+
+### Step 3: The Command Center plans the response
+
+With roads clear, ASAP dispatches ground trucks at a 3000 kg payload ceiling. The schematic view plots every station on GPS coordinates with bilingual labels and live road status.
+
+<img src="images/image2.png" alt="Command Center schematic view showing Base Depot W1 linked to four hospitals with English and Malayalam labels" width="100%"/>
+
+### Step 4: Disaster strikes the route
+
+Inject an obstacle at H1 from the sidebar. The road to Metro General is marked **BLOCKED**, the system switches to air drones, and every payload is re-optimized to fit the 300 kg drone ceiling. With power as the priority, generator fuel now dominates each load.
+
+<img src="images/image9.png" alt="Obstacle injected at H1: road blocked, routes switch to air relief and payloads re-optimized under a 300 kg cap" width="100%"/>
+
+| | Before (Ground, roads clear) | After (Air, H1 blocked) |
+|---|---|---|
+| Payload ceiling | 3000 kg per run | 300 kg per run |
+| H1 cargo | 500 L fuel, 150 kits, 31 crates | 352 L fuel only |
+| H1 road status | OPEN | BLOCKED |
+
+### Step 5: Inspect each engine
+
+The four tabs under the map show the output of each team member's engine. See them in [Mathematical Methodology](#mathematical-methodology) below.
 
 ---
 
@@ -267,7 +297,9 @@ For each edge $(u, v)$ with weight $w(u,v)$, distance is relaxed when:
 
 $$d(v) > d(u) + w(u, v) \;\Rightarrow\; d(v) \leftarrow d(u) + w(u, v)$$
 
-Edges whose flood level exceeds their threshold are removed from the ground network. If no ground path remains, the system switches to air relief mode.
+Edges whose flood level exceeds their threshold are removed from the ground network. If no ground path remains, the system switches to air relief mode. Each station also carries an urgency score (H3 East Wing ER is highest at 10) that feeds the cargo optimizer.
+
+<img src="images/image4.png" alt="Member 2 tab: telemetry and route assessment table with distance, urgency level, road status and dispatch mode per hospital" width="100%"/>
 </details>
 
 <details open>
@@ -288,6 +320,10 @@ $$x_h^{\text{fuel}},\; x_h^{\text{med}},\; x_h^{\text{food}} \in \mathbb{Z}_{\ge
 | Generator Fuel | Litre | 0.85 kg | 5.0 / 1.0 / 3.0 |
 | Medical Kit | Kit | 12.0 kg | 1.0 / 5.0 / 2.5 |
 | Food Crate | Crate | 25.0 kg | 1.0 / 1.0 / 1.2 |
+
+**Worked check (H1, ground mode):** 500 L fuel x 0.85 + 150 kits x 12.0 + 31 crates x 25.0 = 425 + 1800 + 775 = **3000.0 kg**, exactly at the ground ceiling.
+
+<img src="images/image3.png" alt="Member 1 tab: optimized cargo allocation matrix showing fuel, kits and crates delivered per hospital with total payload weight" width="100%"/>
 </details>
 
 <details open>
@@ -300,6 +336,10 @@ $$x_h^{\text{fuel}},\; x_h^{\text{med}},\; x_h^{\text{food}} \in \mathbb{Z}_{\ge
 | Reorder Point | $\text{ROP} = \bar{d} \cdot L + \text{SS}$ | **65 L** |
 
 $Z = 1.65$ corresponds to roughly a 95% service level. With a 3-day lead time, the 65 L reorder point implies an average burn of 10 L/day (30 L lead-time demand plus 35 L safety stock).
+
+The dashboard tracks total dispatch against central reserve ceilings. In the reference run, 1650 L of fuel (of 2000 L), 570 medical kits (of 600) and 149 food crates (of 1000) are dispatched across all four hospitals.
+
+<img src="images/image5.png" alt="Member 3 tab: inventory control cards showing 1650 litres fuel, 570 medical kits and 149 food crates dispatched against reserve ceilings" width="100%"/>
 </details>
 
 <details open>
@@ -312,6 +352,13 @@ $Z = 1.65$ corresponds to roughly a 95% service level. With a 3-day lead time, t
 | Slack | $\text{Slack} = \text{LS} - \text{ES}$ | Zero slack means the task is on the critical path |
 
 The zero-slack sequence **A, D, E, F** forms the critical path, giving a non-delayable mission round trip of **76.33 minutes**.
+
+| Mode | Critical Path Sequence | Loop Duration |
+|---|---|---|
+| Air drone | Cargo Loading, Flight Transit, Winch Offload, Fuel Ingest | **76.33 min** |
+| Ground truck | Cargo Loading, Highway Transit, Offloading | **115.00 min** |
+
+<img src="images/image6.png" alt="Member 4 tab: PERT critical path timeline showing a 115 minute ground truck dispatch loop" width="100%"/>
 </details>
 
 ---
@@ -336,6 +383,7 @@ ASAP/
 ├── server.py                   # Python HTTP API server & middleware
 ├── index.html                  # Dual-view web command center (phone / laptop UI)
 ├── requirements.txt            # Python dependencies
+├── images/                     # README screenshots (image1.png to image9.png)
 ├── c_core/
 │   ├── net_crypto_core.c       # Routing, mode switch & AES-256/HMAC engine
 │   └── net_crypto_core.exe     # Pre-compiled Windows binary
@@ -413,7 +461,7 @@ Ideas, issues and pull requests are welcome.
 3. Commit your changes with a clear message.
 4. Open a pull request describing what changed and why.
 
-Good first contributions: real-world datasets, unit tests for each engine, a Linux/macOS build script, and screenshots for this README.
+Good first contributions: real-world datasets, unit tests for each engine, and a Linux/macOS build script.
 
 ---
 
