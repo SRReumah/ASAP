@@ -175,8 +175,9 @@ st.sidebar.divider()
 if view_mode == "Command Center Dashboard":
     st.sidebar.markdown("#### Environmental Controls")
     
-    # Sync selectbox if emergency distress signal was broadcasted from phone unit
     flood_options = ["None", "H1 - Metro General", "H2 - St. Jude Clinic", "H3 - East Wing ER", "H4 - South Relief Hub"]
+    
+    # Sync selectbox if emergency distress signal was broadcasted from phone unit
     if st.session_state.get("distress_node"):
         for opt in flood_options:
             if opt.startswith(st.session_state["distress_node"]):
@@ -229,7 +230,10 @@ if view_mode == "Hospital Emergency Terminal":
     
     if st.button("BROADCAST EMERGENCY DISTRESS SIGNAL", type="primary", use_container_width=True):
         st.session_state["distress_node"] = h_code
-        st.session_state["flood_select"] = f"{h_code} - "
+        for opt in ["None", "H1 - Metro General", "H2 - St. Jude Clinic", "H3 - East Wing ER", "H4 - South Relief Hub"]:
+            if opt.startswith(h_code):
+                st.session_state["flood_select"] = opt
+                break
         st.success(f"Emergency Distress Signal Broadcasted for Node [{h_code}]. Central Dispatch Notified.")
         st.info("Switch view role in sidebar to 'Command Center Dashboard' to view dispatch response.")
 
@@ -240,17 +244,40 @@ else:
     csv_file = os.path.join("data", "city_nodes.csv")
     sim_rain_param = sim_rain if sim_rain > 0 else None
 
-    # Member 2: Evaluate Telemetry & Mode
-    nodes, auto_mode = evaluate_route_telemetry(
-        csv_file, flood_override_node=selected_node_id, simulated_rain=sim_rain_param
-    )
+    # Safe Evaluation Guard
+    try:
+        nodes, auto_mode = evaluate_route_telemetry(
+            csv_file, flood_override_node=selected_node_id, simulated_rain=sim_rain_param
+        )
+    except Exception as e:
+        st.warning(f"Telemetry engine fallback engaged: {e}")
+        nodes = [
+            {"id": "H1", "name": "Metro General Hospital", "urgency": 5, "distance": 12.0, "distance_km": 12.0, "road_accessible": 0},
+            {"id": "H2", "name": "St. Jude Clinic", "urgency": 3, "distance": 8.5, "distance_km": 8.5, "road_accessible": 1},
+            {"id": "H3", "name": "East Wing ER", "urgency": 4, "distance": 15.2, "distance_km": 15.2, "road_accessible": 1},
+            {"id": "H4", "name": "South Relief Hub", "urgency": 2, "distance": 6.0, "distance_km": 6.0, "road_accessible": 1}
+        ]
+        auto_mode = 1 if selected_node_id else 0
 
-    # Member 1: Solve LPP Optimization
-    allocation_result = run_lpp_allocation(nodes, target_mode=auto_mode)
+    # Safe LPP Solver Guard
+    try:
+        allocation_result = run_lpp_allocation(nodes, target_mode=auto_mode)
+    except Exception as e:
+        st.warning(f"LPP Solver fallback engaged: {e}")
+        allocation_result = {
+            "dispatch_mode": "AIR_RELIEF_DRONE" if auto_mode == 1 else "GROUND_TRUCK",
+            "payload_weight_cap_kg": 300.0 if auto_mode == 1 else 3000.0,
+            "allocations": {
+                "H1": {"name": "Metro General Hospital", "fuel_liters": 180, "medical_kits": 6, "food_crates": 2, "delivered_weight_kg": 275.0, "distance_km": 12.0, "road_accessible": 0},
+                "H2": {"name": "St. Jude Clinic", "fuel_liters": 100, "medical_kits": 4, "food_crates": 1, "delivered_weight_kg": 158.0, "distance_km": 8.5, "road_accessible": 1},
+                "H3": {"name": "East Wing ER", "fuel_liters": 120, "medical_kits": 5, "food_crates": 2, "delivered_weight_kg": 212.0, "distance_km": 15.2, "road_accessible": 1},
+                "H4": {"name": "South Relief Hub", "fuel_liters": 80, "medical_kits": 2, "food_crates": 1, "delivered_weight_kg": 117.0, "distance_km": 6.0, "road_accessible": 1}
+            }
+        }
 
-    mode_name = allocation_result["dispatch_mode"]
-    weight_cap = allocation_result["payload_weight_cap_kg"]
-    allocations = allocation_result["allocations"]
+    mode_name = allocation_result.get("dispatch_mode", "AIR_RELIEF_DRONE")
+    weight_cap = allocation_result.get("payload_weight_cap_kg", 300.0)
+    allocations = allocation_result.get("allocations", {})
 
     # SYSTEM STATUS BANNER
     st.markdown("## ASAP: Disaster Relief Command Center")
@@ -314,16 +341,20 @@ else:
                 hoverinfo="text"
             ))
 
-        # Hospital Nodes and Path Vectors (Kochi Offset Array)
+        # Hospital Nodes and Path Vectors
         for h in nodes:
-            if is_gis_mode:
-                h_lat = 9.965 if h["id"] == "H1" else 9.940 if h["id"] == "H2" else 9.980 if h["id"] == "H3" else 9.895
-                h_lon = 76.242 if h["id"] == "H1" else 76.305 if h["id"] == "H2" else 76.280 if h["id"] == "H3" else 76.255
-            else:
-                h_lat = warehouse_lat + (0.015 if h["id"] == "H1" else -0.012 if h["id"] == "H2" else 0.008 if h["id"] == "H3" else -0.020)
-                h_lon = warehouse_lon + (0.012 if h["id"] == "H1" else -0.015 if h["id"] == "H2" else 0.022 if h["id"] == "H3" else 0.005)
+            h_id = h.get("id", "H1")
+            h_name = h.get("name", "Hospital")
+            road_acc = h.get("road_accessible", 1)
 
-            is_blocked = (h["road_accessible"] == 0)
+            if is_gis_mode:
+                h_lat = 9.965 if h_id == "H1" else 9.940 if h_id == "H2" else 9.980 if h_id == "H3" else 9.895
+                h_lon = 76.242 if h_id == "H1" else 76.305 if h_id == "H2" else 76.280 if h_id == "H3" else 76.255
+            else:
+                h_lat = warehouse_lat + (0.015 if h_id == "H1" else -0.012 if h_id == "H2" else 0.008 if h_id == "H3" else -0.020)
+                h_lon = warehouse_lon + (0.012 if h_id == "H1" else -0.015 if h_id == "H2" else 0.022 if h_id == "H3" else 0.005)
+
+            is_blocked = (road_acc == 0)
 
             if is_blocked:
                 line_color = "#dc2626"
@@ -338,7 +369,7 @@ else:
                 marker_color = "#16a34a"
                 status_txt = "CLEAR / OPEN (തുറന്നിരിക്കുന്നു)"
 
-            h_bilingual_label = BILINGUAL_NAMES.get(h["id"], f"{h['id']}: {h['name']}")
+            h_bilingual_label = BILINGUAL_NAMES.get(h_id, f"{h_id}: {h_name}")
 
             # Draw Route Connection Line
             if is_gis_mode:
@@ -348,7 +379,7 @@ else:
                     mode="lines",
                     marker=dict(size=4, color=line_color),
                     text=None,
-                    name=f"Path {h['id']}"
+                    name=f"Path {h_id}"
                 ))
                 fig_map.add_trace(create_map_trace(
                     lat=[h_lat],
@@ -356,7 +387,7 @@ else:
                     mode="markers+text",
                     marker=dict(size=18, color=marker_color),
                     text=[f"<b>{h_bilingual_label}</b><br>[{status_txt}]"],
-                    name=f"Node {h['id']}"
+                    name=f"Node {h_id}"
                 ))
             else:
                 fig_map.add_trace(go.Scatter(
@@ -374,12 +405,11 @@ else:
                     marker=dict(size=16, color=marker_color, symbol=marker_symbol, line=dict(width=2, color="#ffffff")),
                     text=[f"<b>{h_bilingual_label}</b><br>[{status_txt}]"],
                     textposition="bottom center",
-                    name=f"Node {h['id']}",
+                    name=f"Node {h_id}",
                     hoverinfo="text"
                 ))
 
         if is_gis_mode:
-            # CartoDB Voyager Tile Style: English geographic labels everywhere!
             voyager_dict = dict(
                 style="carto-voyager",
                 zoom=11.4,
@@ -425,10 +455,10 @@ else:
         fuel_kg = []
 
         for h_id, data in allocations.items():
-            h_names.append(f"{h_id}: {data['name']}")
-            meds.append(round(data['medical_kits'] * 12.0, 1))
-            food.append(round(data['food_crates'] * 25.0, 1))
-            fuel_kg.append(round(data['fuel_liters'] * 0.85, 1))
+            h_names.append(f"{h_id}: {data.get('name', h_id)}")
+            meds.append(round(data.get('medical_kits', 0) * 12.0, 1))
+            food.append(round(data.get('food_crates', 0) * 25.0, 1))
+            fuel_kg.append(round(data.get('fuel_liters', 0) * 0.85, 1))
 
         fig_cargo = go.Figure()
         fig_cargo.add_trace(go.Bar(name="Generator Fuel (kg)", x=h_names, y=fuel_kg, marker_color="#38bdf8"))
@@ -465,15 +495,23 @@ else:
         
         table_rows = []
         for h_id, data in allocations.items():
+            m_kits = data.get('medical_kits', 0)
+            f_crates = data.get('food_crates', 0)
+            f_liters = data.get('fuel_liters', 0)
+            
+            calc_weight = round((m_kits * 12.0) + (f_crates * 25.0) + (f_liters * 0.85), 2)
+            delivered_w = data.get('delivered_weight_kg', calc_weight)
+            dist_val = data.get('distance_km', data.get('distance', 10.0))
+            
             table_rows.append({
                 "Node ID": h_id,
-                "Hospital Name": data["name"],
-                "Fuel Delivered": f"{data['fuel_liters']} L",
-                "Meds Delivered": f"{data['medical_kits']} Kits",
-                "Food Delivered": f"{data['food_crates']} Crates",
-                "Total Payload Weight": f"{data['delivered_weight_kg']} kg",
-                "Road Accessibility": "OPEN" if data["road_accessible"] == 1 else "BLOCKED",
-                "Displacement Distance": f"{data['distance_km']} km"
+                "Hospital Name": data.get("name", h_id),
+                "Fuel Delivered": f"{f_liters} L",
+                "Meds Delivered": f"{m_kits} Kits",
+                "Food Delivered": f"{f_crates} Crates",
+                "Total Payload Weight": f"{delivered_w} kg",
+                "Road Accessibility": "OPEN" if data.get("road_accessible", 1) == 1 else "BLOCKED",
+                "Displacement Distance": f"{dist_val} km"
             })
         
         st.dataframe(pd.DataFrame(table_rows), use_container_width=True, hide_index=True)
@@ -484,12 +522,18 @@ else:
         
         telemetry_rows = []
         for h in nodes:
+            h_id = h.get('id', '')
+            h_name = h.get('name', '')
+            dist_val = h.get('distance_km', h.get('distance', 10.0))
+            road_status = h.get('road_accessible', 1)
+            urgency_lvl = h.get('urgency', 5)
+            
             telemetry_rows.append({
-                "Hospital Station": f"{h['id']} - {h['name']}",
-                "Displacement Distance": f"{h['distance']} km",
-                "Priority Score": f"Urgency Level {h['urgency']}",
-                "Road Status": "Clear (Road Open)" if h['road_accessible'] == 1 else "BLOCKED (Inaccessible)",
-                "Routed Dispatch Mode": "GROUND TRUCK" if h['road_accessible'] == 1 and auto_mode == 0 else "AIR RELIEF DRONE"
+                "Hospital Station": f"{h_id}: {h_name}",
+                "Displacement Distance": f"{dist_val} km",
+                "Priority Score": f"Urgency Level {urgency_lvl}",
+                "Road Status": "Clear (Road Open)" if road_status == 1 else "BLOCKED (Inaccessible)",
+                "Routed Dispatch Mode": "GROUND TRUCK" if road_status == 1 and auto_mode == 0 else "AIR RELIEF DRONE"
             })
         st.dataframe(pd.DataFrame(telemetry_rows), use_container_width=True, hide_index=True)
 
@@ -497,9 +541,9 @@ else:
         st.markdown("##### Member 3: Inventory Control & Generator Reserves")
         col_m3_1, col_m3_2, col_m3_3 = st.columns(3)
         
-        total_fuel = sum(d['fuel_liters'] for d in allocations.values())
-        total_meds = sum(d['medical_kits'] for d in allocations.values())
-        total_food = sum(d['food_crates'] for d in allocations.values())
+        total_fuel = sum(d.get('fuel_liters', 0) for d in allocations.values())
+        total_meds = sum(d.get('medical_kits', 0) for d in allocations.values())
+        total_food = sum(d.get('food_crates', 0) for d in allocations.values())
         
         with col_m3_1:
             st.metric("Total Fuel Dispatched", f"{total_fuel} Liters", delta="Central Reserve Ceiling: 2000 L")
